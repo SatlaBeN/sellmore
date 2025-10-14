@@ -1,0 +1,66 @@
+
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+model User {
+  id         String   @id @default(cuid())
+  whopUserId String   @unique
+  email      String?
+  role       Role     @default(CUSTOMER)
+  createdAt  DateTime @default(now())
+  products   Product[]
+  subs       Subscription[]
+  orders     Order[]
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  priceCents    Int
+  productLimit  Int
+  whopPriceSlug String   @unique
+  createdAt     DateTime @default(now())
+}
+
+model Subscription {
+  id               String   @id @default(cuid())
+  user             User     @relation(fields: [userId], references: [id])
+  userId           String
+  plan             Plan     @relation(fields: [planId], references: [id])
+  planId           String
+  whopPurchaseId   String   @unique
+  status           String
+  currentPeriodEnd DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     String
+  title       String
+  description String
+  priceCents  Int
+  whopSkuSlug String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  buyer           User     @relation(fields: [buyerId], references: [id])
+  buyerId         String
+  product         Product  @relation(fields: [productId], references: [id])
+  productId       String
+  amountCents     Int
+  status          String
+  whopCheckoutId  String?  @unique
+  createdAt       DateTime @default(now())
+}
