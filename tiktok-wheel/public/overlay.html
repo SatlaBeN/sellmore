@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wheel Overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;800&display=swap">
+<style>
+  :root {
+    --ink: #ffffff;
+    --card: rgba(12, 12, 20, 0.78);
+    --accent: #ffd400;
+  }
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Rubik", "Heebo", "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+  }
+  #stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2vmin;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  #stage.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  #title {
+    font-size: 4vmin;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0.4vmin 1vmin rgba(0, 0, 0, 0.7);
+  }
+  #title:empty { display: none; }
+  #who {
+    display: flex;
+    align-items: center;
+    gap: 1.6vmin;
+    min-height: 7vmin;
+    padding: 0.8vmin 3vmin 0.8vmin 1vmin;
+    border-radius: 99px;
+    background: var(--card);
+    box-shadow: 0 0.6vmin 2vmin rgba(0, 0, 0, 0.45);
+    font-size: 3.4vmin;
+    font-weight: 800;
+  }
+  #who.hidden { visibility: hidden; }
+  #who img {
+    width: 6vmin;
+    height: 6vmin;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 0.4vmin solid var(--accent);
+  }
+  #who .count {
+    font-weight: 500;
+    opacity: 0.75;
+    font-size: 2.6vmin;
+  }
+  #wheelWrap {
+    position: relative;
+    width: 66vmin;
+    height: 66vmin;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 1vmin 2.4vmin rgba(0, 0, 0, 0.55));
+  }
+  #pointer {
+    position: absolute;
+    top: -2.2vmin;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: translateX(-50%);
+    transform-origin: 50% 20%;
+    border-left: 3vmin solid transparent;
+    border-right: 3vmin solid transparent;
+    border-top: 6.5vmin solid var(--accent);
+    filter: drop-shadow(0 0.4vmin 0.5vmin rgba(0, 0, 0, 0.7));
+    z-index: 2;
+  }
+  /* Sits on the lower half so the winning slice under the pointer stays visible. */
+  #result {
+    position: absolute;
+    left: 50%;
+    top: 74%;
+    width: max-content;
+    max-width: 90%;
+    padding: 2.4vmin 4vmin;
+    border-radius: 3vmin;
+    background: var(--card);
+    border: 0.6vmin solid var(--accent);
+    box-shadow: 0 1vmin 4vmin rgba(0, 0, 0, 0.6);
+    text-align: center;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+    z-index: 3;
+  }
+  #result.show { transform: translate(-50%, -50%) scale(1); }
+  #result .label {
+    font-size: 5.4vmin;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1.15;
+  }
+  #result .for {
+    margin-top: 1vmin;
+    font-size: 3vmin;
+    opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="title"></div>
+  <div id="who" class="hidden">
+    <img id="avatar" alt="" referrerpolicy="no-referrer">
+    <span id="name"></span>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="wheelWrap">
+    <div id="pointer"></div>
+    <canvas id="wheel"></canvas>
+    <div id="result">
+      <div class="label" id="resultLabel"></div>
+      <div class="for" id="resultFor"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const TAU = Math.PI * 2;
+  const params = new URLSearchParams(location.search);
+  const forceVisible = params.has('always');
+  const soundOn = params.get('sound') !== '0';
+
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage');
+  const canvas = $('wheel');
+  const ctx = canvas.getContext('2d');
+
+  let config = null;
+  let arcs = [];
+  let rotation = 0;
+  let spinning = null;
+
+  const mod = (x, m) => ((x % m) + m) % m;
+
+  // Slice size follows weight, so what viewers see on screen is the real chance.
+  function setSegments(segments) {
+    const total = segments.reduce((sum, s) => sum + s.weight, 0);
+    let start = 0;
+    arcs = segments.map((s, i) => {
+      const end = start + (s.weight / total) * TAU;
+      const arc = { ...s, start, end, color: s.color || `hsl(${(i * 360) / segments.length}, 85%, 55%)` };
+      start = end;
+      return arc;
+    });
+  }
+
+  function segmentUnderPointer() {
+    const theta = mod(-rotation, TAU);
+    return arcs.findIndex((a) => theta >= a.start && theta < a.end);
+  }
+
+  function fitFont(label, radius, span) {
+    let size = Math.min(radius * 0.085, radius * 0.6 * span * 0.75);
+    const maxWidth = radius * 0.66;
+    ctx.font = `800 ${size}px Rubik, Heebo, "Segoe UI", Arial, sans-serif`;
+    while (size > 10 && ctx.measureText(label).width > maxWidth) {
+      size -= 1;
+      ctx.font = `800 ${size}px Rubik, Heebo, "Segoe UI", Arial, sans-serif`;
+    }
+    return size;
+  }
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.round(canvas.clientWidth * dpr);
+    if (!size) return;
+    if (canvas.width !== size) canvas.width = canvas.height = size;
+
+    const c = size / 2;
+    const r = c * 0.95;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    ctx.translate(c, c);
+    ctx.rotate(rotation - Math.PI / 2);
+
+    for (const a of arcs) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, a.start, a.end);
+      ctx.closePath();
+      ctx.fillStyle = a.color;
+      ctx.fill();
+      ctx.lineWidth = r * 0.012;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.stroke();
+    }
+
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (const a of arcs) {
+      ctx.save();
+      ctx.rotate((a.start + a.end) / 2);
+      const fontSize = fitFont(a.label, r, a.end - a.start);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = fontSize * 0.16;
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.strokeText(a.label, r * 0.9, 0);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(a.label, r * 0.9, 0);
+      ctx.restore();
+    }
+
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.lineWidth = r * 0.035;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.13, 0, TAU);
+    ctx.fillStyle = '#16161f';
+    ctx.fill();
+    ctx.lineWidth = r * 0.03;
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ffd400';
+    ctx.stroke();
+  }
+
+  // ---------- Sound ----------
+  let audio = null;
+  function beep(freq, duration, volume, when = 0) {
+    if (!soundOn) return;
+    try {
+      audio = audio || new AudioContext();
+      const t = audio.currentTime + when;
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(volume, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t);
+      osc.stop(t + duration + 0.02);
+    } catch {
+      // Audio is optional (blocked until a click in a normal browser tab; allowed in OBS).
+    }
+  }
+  const tick = () => beep(1500, 0.04, 0.12);
+  const chime = () => [660, 880, 1320].forEach((f, i) => beep(f, 0.35, 0.18, i * 0.12));
+
+  function wigglePointer() {
+    $('pointer').animate(
+      [{ transform: 'translateX(-50%) rotate(14deg)' }, { transform: 'translateX(-50%) rotate(0deg)' }],
+      { duration: 110 }
+    );
+  }
+
+  // ---------- Spin flow ----------
+  function setVisible(on) {
+    stage.classList.toggle('visible', on || forceVisible || Boolean(config?.alwaysVisible));
+  }
+
+  function showWho(spin) {
+    $('name').textContent = spin.nickname || spin.username || '';
+    $('count').textContent = spin.spinsTotal > 1 ? `סיבוב ${spin.spinNumber}/${spin.spinsTotal}` : '';
+    const img = $('avatar');
+    img.style.display = spin.avatar ? '' : 'none';
+    if (spin.avatar) img.src = spin.avatar;
+    $('who').classList.remove('hidden');
+  }
+
+  function startSpin(spin) {
+    if (!arcs.length) return;
+    if (spinning) finishSpin();
+    $('result').classList.remove('show');
+    showWho(spin);
+    setVisible(true);
+
+    const arc = arcs[spin.segmentIndex];
+    const landAt = arc.start + (0.15 + Math.random() * 0.7) * (arc.end - arc.start);
+    const turns = 6 + Math.floor(Math.random() * 3);
+    const from = rotation;
+    const to = from + turns * TAU + mod(-landAt - from, TAU);
+    const duration = config.spinDurationMs;
+    const startedAt = performance.now();
+    let lastIndex = segmentUnderPointer();
+
+    spinning = { spin, to, timer: setTimeout(finishSpin, duration) };
+
+    const frame = (now) => {
+      if (!spinning || spinning.spin !== spin) return;
+      const t = Math.min(1, (now - startedAt) / duration);
+      rotation = from + (to - from) * (1 - Math.pow(1 - t, 4));
+      draw();
+      const index = segmentUnderPointer();
+      if (index !== lastIndex) {
+        lastIndex = index;
+        tick();
+        wigglePointer();
+      }
+      if (t < 1) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
+  // Runs on a timer as well as at the end of the animation, so the result still shows if frames were throttled.
+  function finishSpin() {
+    if (!spinning) return;
+    const { spin, to, timer } = spinning;
+    clearTimeout(timer);
+    spinning = null;
+    rotation = mod(to, TAU);
+    draw();
+    $('resultLabel').textContent = spin.result;
+    $('resultFor').textContent = spin.nickname ? `בשביל ${spin.nickname}` : '';
+    $('result').classList.add('show');
+    chime();
+  }
+
+  function endSpin() {
+    if (spinning) finishSpin();
+    $('result').classList.remove('show');
+    $('who').classList.add('hidden');
+    setVisible(false);
+  }
+
+  // ---------- Server connection ----------
+  function connect() {
+    const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'config') {
+        config = msg.config;
+        $('title').textContent = config.title || '';
+        setSegments(config.segments);
+        setVisible(false);
+        draw();
+      } else if (msg.type === 'spin') {
+        startSpin(msg.spin);
+      } else if (msg.type === 'idle') {
+        endSpin();
+      }
+    };
+    ws.onclose = () => setTimeout(connect, 2000);
+  }
+
+  window.addEventListener('resize', draw);
+  document.fonts.ready.then(draw);
+  connect();
+</script>
+</body>
+</html>

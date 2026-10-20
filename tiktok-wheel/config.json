@@ -1,0 +1,26 @@
+{
+  "tiktokUsername": "your_tiktok_username",
+  "signApiKey": "",
+  "host": "127.0.0.1",
+  "port": 8080,
+
+  "coinsPerSpin": 1000,
+  "accumulateGifts": true,
+  "maxSpinsPerGift": 3,
+
+  "spinDurationMs": 7000,
+  "resultDisplayMs": 6000,
+  "alwaysVisible": false,
+  "title": "גלגל האתגרים",
+
+  "segments": [
+    { "label": "שיר לבחירתכם", "weight": 2, "color": "#ff3b6b" },
+    { "label": "10 שכיבות סמיכה", "weight": 2, "color": "#ffb020" },
+    { "label": "שאוטאאוט ענק", "weight": 3, "color": "#2ecc71" },
+    { "label": "ריקוד 30 שניות", "weight": 2, "color": "#3d8bff" },
+    { "label": "מבטא מצחיק ל-5 דקות", "weight": 1, "color": "#a35cff" },
+    { "label": "שאלה אישית", "weight": 2, "color": "#00c2c7" },
+    { "label": "אתם בוחרים את המוצר הבא", "weight": 1, "color": "#ff7a00" },
+    { "label": "פולואו בחזרה", "weight": 2, "color": "#e84393" }
+  ]
+}
