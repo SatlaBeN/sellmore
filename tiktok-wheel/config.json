@@ -11,16 +11,19 @@
   "spinDurationMs": 7000,
   "resultDisplayMs": 6000,
   "alwaysVisible": false,
-  "title": "גלגל האתגרים",
+  "title": "גלגל האתגרים של CS2",
 
   "segments": [
-    { "label": "שיר לבחירתכם", "weight": 2, "color": "#ff3b6b" },
-    { "label": "10 שכיבות סמיכה", "weight": 2, "color": "#ffb020" },
-    { "label": "שאוטאאוט ענק", "weight": 3, "color": "#2ecc71" },
-    { "label": "ריקוד 30 שניות", "weight": 2, "color": "#3d8bff" },
-    { "label": "מבטא מצחיק ל-5 דקות", "weight": 1, "color": "#a35cff" },
-    { "label": "שאלה אישית", "weight": 2, "color": "#00c2c7" },
-    { "label": "אתם בוחרים את המוצר הבא", "weight": 1, "color": "#ff7a00" },
-    { "label": "פולואו בחזרה", "weight": 2, "color": "#e84393" }
+    { "label": "פתיחת קייס", "weight": 2, "color": "#ffb020" },
+    { "label": "ראונד רק עם סכין", "weight": 3, "color": "#3d8bff" },
+    { "label": "ראונד רק עם דיגל", "weight": 3, "color": "#2ecc71" },
+    { "label": "Rush B בלי לעצור", "weight": 3, "color": "#ff3b6b" },
+    { "label": "ראונד בלי סאונד", "weight": 2, "color": "#a35cff" },
+    { "label": "פתיחת 5 קייסים", "weight": 0.5, "color": "#ff7a00" },
+    { "label": "ראונד רק עם AWP", "weight": 3, "color": "#00c2c7" },
+    { "label": "רגישות כפולה לראונד", "weight": 2, "color": "#e84393" },
+    { "label": "המפה הבאה עליכם", "weight": 2, "color": "#5f6cff" },
+    { "label": "1v1 נגד הצופה", "weight": 1.5, "color": "#14b8a6" },
+    { "label": "שאוטאאוט + פולואו", "weight": 3, "color": "#f43f5e" }
   ]
 }
